@@ -37,6 +37,8 @@ int main(int argc, char *argv[])
 
     app.windowWidth = 600;
     app.windowHeight = 600;
+    app.leftScore = 0;
+    app.rightScore = 0;
     
     if (InitWindow(&app) > 0)
         return 1;
@@ -73,6 +75,8 @@ int main(int argc, char *argv[])
     
     Model model = BuildModel(&vertices, &indices, STATIC_DRAW);
 
+    u32 gridShader = GenerateShaderFromFiles("assets/shaders/logo.vs", "assets/shaders/grid.fs");
+
     Entity* ball = Spawn(&scene);
     ball->transform.position = InitVector3(app.windowWidth * 0.5f, app.windowHeight * 0.5f, 0.0f);
     ball->data = calloc(1, sizeof(Ball));
@@ -107,7 +111,18 @@ int main(int argc, char *argv[])
     rightPaddle->Update = PaddleUpdate;
     rightPaddle->Draw = PaddleDraw;
     rightPaddle->OnDestroy = PaddleOnDestroy;
-    
+
+    Entity* background = Spawn(&scene);
+    background->name = "background";
+    background->transform.position = InitVector3(app.windowWidth * 0.5f, app.windowHeight * 0.5f, -1.0f);
+    background->transform.scale = InitVector3(app.windowWidth, app.windowHeight, 1.0f);
+    background->image = &squareImage;
+    background->model = &model;
+    background->shaderId = gridShader;
+    background->color = InitVector4(0.9f, 0.9f, 0.9f, 1.0f);
+    background->Draw = PaddleDraw;
+
+    const int WINNING_SCORE = 5;
     bool running = true;
     f32 time = 0.0f;
     while(running) {
@@ -137,6 +152,23 @@ int main(int argc, char *argv[])
         Mat4Translate(&app.view, InitVector3(0.0f, 0.0f, -0.5f));
 
         SceneUpdate(&app, &scene);
+
+        char title[256];
+        if (app.leftScore >= WINNING_SCORE || app.rightScore >= WINNING_SCORE) {
+            if (app.leftScore >= WINNING_SCORE)
+                sprintf(title, "Game Over - Left wins %d | Right: %d", app.leftScore, app.rightScore);
+            else
+                sprintf(title, "Game Over - Right wins %d | Left: %d", app.rightScore, app.leftScore);
+
+            SetWindowTitle(&app, title);
+            SceneDraw(&app, &scene);
+            SwapWindow(&app);
+            SDL_Delay(2000);
+            break;
+        }
+
+        sprintf(title, "Pong - Left: %d | Right: %d", app.leftScore, app.rightScore);
+        SetWindowTitle(&app, title);
 
         SceneDraw(&app, &scene);
 

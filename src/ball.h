@@ -9,6 +9,7 @@
 typedef struct {
     int leftScore;
     int rightScore;
+    int lastPaddleHit; // 0 is none, 1 is left, 2 is right
 } Ball;
 
 Entity* SpawnBall(AppContext* _app, Entity* _entity);
@@ -17,6 +18,22 @@ void BallStart(AppContext* _app, Entity* _entity) {
     _entity->color = InitVector4(1.0f, 1.0f, 1.0f, 1.0f);
 
     _entity->transform.scale = InitVector3(32.0f, 32.0f, 1.0f);
+
+    if (_entity->data) {
+        Ball* ball = (Ball*)_entity->data;
+        ball->lastPaddleHit = 0;
+    }
+}
+
+static bool RectOverlap(Vector3 aPos, Vector3 aScale, Vector3 bPos, Vector3 bScale)
+{
+    Vector3 aMin = InitVector3(aPos.x - aScale.x * 0.5f, aPos.y - aScale.y * 0.5f, 0.0f);
+    Vector3 aMax = InitVector3(aPos.x + aScale.x * 0.5f, aPos.y + aScale.y * 0.5f, 0.0f);
+    Vector3 bMin = InitVector3(bPos.x - bScale.x * 0.5f, bPos.y - bScale.y * 0.5f, 0.0f);
+    Vector3 bMax = InitVector3(bPos.x + bScale.x * 0.5f, bPos.y + bScale.y * 0.5f, 0.0f);
+
+    return (aMin.x <= bMax.x && aMax.x >= bMin.x) &&
+           (aMin.y <= bMax.y && aMax.y >= bMin.y);
 }
 
 void BallUpdate(AppContext* _app, Entity* _entity) {
@@ -51,9 +68,53 @@ void BallUpdate(AppContext* _app, Entity* _entity) {
     Vector3 delta = Vec2ToVec3(Vec2Mul(_entity->velocity, _app->deltaTime));
     _entity->transform.position = Vec3Add(_entity->transform.position, delta);
 
+    // Check for score
+    if (_entity->transform.position.x < 0.0f) {
+        // Right player scores
+        _app->rightScore++;
+        // Reset ball
+        _entity->transform.position = InitVector3(_app->windowWidth * 0.5f, _app->windowHeight * 0.5f, 0.0f);
+        _entity->velocity = InitVector2(0.0f, 0.0f);
+        _entity->color = InitVector4(1.0f, 1.0f, 1.0f, 1.0f);
+    } else if (_entity->transform.position.x > _app->windowWidth) {
+        // Left player scores
+        _app->leftScore++;
+        // Reset ball
+        _entity->transform.position = InitVector3(_app->windowWidth * 0.5f, _app->windowHeight * 0.5f, 0.0f);
+        _entity->velocity = InitVector2(0.0f, 0.0f);
+        _entity->color = InitVector4(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+
+    Ball* ball = (Ball*)_entity->data;
+    int currentPaddleHit = 0;
+
     Entity* lp = Find(&_app->scene, "leftPaddle");
-    if (lp)
-        printf("LeftPaddle: %s\n", lp->name);
+    if (lp && RectOverlap(_entity->transform.position, _entity->transform.scale, lp->transform.position, lp->transform.scale)) {
+        currentPaddleHit = 1;
+    }
+
+    Entity* rp = Find(&_app->scene, "rightPaddle");
+    if (rp && RectOverlap(_entity->transform.position, _entity->transform.scale, rp->transform.position, rp->transform.scale)) {
+        currentPaddleHit = 2;
+    }
+
+    if (ball && currentPaddleHit != 0 && ball->lastPaddleHit != currentPaddleHit) {
+        if (currentPaddleHit == 1) {
+            _entity->velocity.x = fabsf(_entity->velocity.x);
+            _entity->color = lp->color;
+            _entity->transform.position.x = lp->transform.position.x + (lp->transform.scale.x + _entity->transform.scale.x) * 0.5f + 1.0f;
+        } else {
+            _entity->velocity.x = -fabsf(_entity->velocity.x);
+            _entity->color = rp->color;
+            _entity->transform.position.x = rp->transform.position.x - (rp->transform.scale.x + _entity->transform.scale.x) * 0.5f - 1.0f;
+        }
+
+        ball->lastPaddleHit = currentPaddleHit;
+    }
+
+    if (ball && currentPaddleHit == 0) {
+        ball->lastPaddleHit = 0;
+    }
 }
 
 void BallDraw(AppContext* _app, Entity* _entity) {

@@ -18,6 +18,8 @@ typedef struct AppContext {
     f32 deltaTime;
     bool previousKeys[SDL_SCANCODE_COUNT];
     bool currentKeys[SDL_SCANCODE_COUNT];
+    int leftScore;
+    int rightScore;
 } AppContext;
 
 extern i32 InitCanis();
